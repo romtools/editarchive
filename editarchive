@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+import click
+import torrentarchive 
+import sys
+
+@click.group()
+@click.pass_context
+def cli(ctx):
+  """
+  +== editarchive by romtools v20181111 (testing) ==+
+
+  archive editing tool for t7z and torrentzip archives.
+
+  == commands ==
+
+  edit: edits filenames within t7z and torrentzip archives without recompression.
+  
+  sign: signs (or re-signs) an archive
+  """
+  pass
+
+
+@cli.command()
+@click.argument('archive', required=True, type=click.Path(exists=True, writable=True))
+@click.pass_context
+def sign(ctx, archive):
+  """
+  Signs (or re-signs) a TorrentZip or T7Z archive.
+  """
+  t = torrentarchive.get(archive)
+  if not t:
+    sys.exit(1)
+  t.sign()
+
+
+@cli.command()
+@click.option('--out-archive', '-o', required=True, help="full path to save archive", type=click.Path(exists=False, writable=True))
+@click.option('--run-test', is_flag=True, default=False, help="debug mode (ignore)")
+
+@click.option('--search-str', help="search/replace text in filenames")
+@click.option('--repl-str', help="search/replace text in filenames")
+
+@click.option('--old-name', help="replace exact matches")
+@click.option('--new-name', help="replace exact matches")
+
+@click.argument('archive', required=False, type=click.Path(exists=True, writable=True))
+@click.pass_context
+def edit(ctx, out_archive, run_test, search_str, repl_str, old_name, new_name, archive):
+  """
+  edits t7z and trrntzip archives, allowing file renames without 
+  recompression.
+
+  EXAMPLES
+ 
+  To edit a single filename in an archive:
+
+  \b
+  editarchive --old-name "Donkey Kong Country Returns.bin"
+    --new-name "Donkey Dong Dountry Deturns.bin"
+    "Donkey Kong Country Returns.7z"
+
+  To edit all files with basic string replacement:
+
+  \b
+  editarchive --search-str "Donkey Kong" --repl-str "Dankey Kang"
+    "Donkey Kong Country Returns.7z"
+
+  NOTES
+
+  Archives with nested folders are supported. Please test them.
+
+  Both t7z and trrntzip sort files alphabetically when creating 
+  archives; if a rename operation would upset this order, it will
+  be abandoned and an error displayed.
+
+  """
+  
+  if not ((search_str and repl_str) or (old_name and new_name) or run_test):
+    click.echo(ctx.get_help())
+    sys.exit(1)
+  
+
+  a = torrentarchive.get(archive)
+  if not a:
+    sys.exit(1)
+
+  if (not out_archive):
+    print("Error: An output filename must be specified with --out")
+    sys.exit(1)
+
+  if out_archive and not (out_archive.endswith('7z') or out_archive.endswith('zip')):
+    print("Error: The --out-archive option needs a full path, with filename")
+    sys.exit(1)
+
+  if run_test:
+    print("Archive contents:")
+    c = a.get_archive_contents()
+    for e in c['entries']:
+      t_str = 'File' if e['type'] == 'reg' else 'Directory'
+      print("  %s: %s (%d)" % (t_str, e['path'], e['size']))
+
+    sys.exit(0)
+
+  if search_str and repl_str:
+    if not a.rename_replace(search_str, repl_str, new_archive_filename=out_archive):
+      print("No matching filenames found in archive.")
+      sys.exit(1)
+
+  if old_name and new_name:
+    if not a.rename_files([(old_name, new_name)], new_archive_filename=out_archive):
+      print("Error renaming files.")
+      sys.exit(1)
+  
+
+if __name__ == '__main__':
+  cli()
