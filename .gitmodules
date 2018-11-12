@@ -1,0 +1,3 @@
+[submodule "torrentarchive"]
+	path = torrentarchive
+	url = git://github.com/romtools/torrentarchive.git
